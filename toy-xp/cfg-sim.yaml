@@ -1,0 +1,15 @@
+ckpt: True
+prefix: toy-xp
+epochs: 300 # number of training epochs
+seed: 77777 # randomness seed
+cuda: True # use nvidia gpu
+img_size: 96 #image shape
+save: "./saved_models/" # save checkpoint
+load: False # load pretrained checkpoint
+gradient_accumulation_steps: 5 # gradient accumulation steps
+batch_size: 200
+lr: 3e-4 # for ADAm only
+weight_decay: 1e-6
+embedding_size: 128 # papers value is 128
+temperature: 0.5 # 0.1 or 0.5
+# self.checkpoint_path = './SimCLR_ResNet18.ckpt' # replace checkpoint path here
