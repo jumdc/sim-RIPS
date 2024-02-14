@@ -29,13 +29,15 @@ def train(cfg: DictConfig):
     data_loader = get_stl_dataloader(root=cfg.stl10, 
                                      batch_size=cfg.batch_size, 
                                      transform=transform)
-    ### Self-supervised steps
+    ### Self-supervised 
     accumulator = GradientAccumulationScheduler(scheduling={0: cfg.training.gradient_accumulation_steps})
     trainer = Trainer(callbacks=[accumulator],
-                      overfit_batches=cfg.overfit_batches,
-                     gpus=cfg.gpu,
-                     max_epochs=cfg.epochs)
-    trainer.fit(model, data_loader['train'], data_loader['val'])
+                    overfit_batches=cfg.overfit_batches,
+                    gpus=cfg.gpu,
+                    max_epochs=cfg.epochs)
+    trainer.fit(model, 
+                data_loader['train'], 
+                data_loader['val'])
 
     ### Linear evaluation 
     model.make_classifier()
@@ -47,8 +49,11 @@ def train(cfg: DictConfig):
                                         batch_size=cfg.batch_size, 
                                         transform=transform.test_transform,
                                         split='test')
-    trainer.fit(model, data_loader['train'], data_loader['val'])
-    trainer.test(model, data_loader_test)
+    trainer.fit(model, 
+                data_loader['train'], 
+                data_loader['val'])
+    trainer.test(model, 
+                 data_loader_test)
 
 
 if __name__ == "__main__":
