@@ -6,48 +6,113 @@ from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import SGD, Adam
 from utils import default
 import torchvision.models as models
+from torchmetrics import Accuracy
 
 from torch import einsum
 
 class SimCLR_pl(pl.LightningModule):
-    def __init__(self, cfg, model=None, feat_dim=512):
+    def __init__(self, cfg, model=None, feat_dim=512, stage="self-supervised"):
         super().__init__()
         self.cfg = cfg
         self.model = Encoder(self.cfg, model=model, mlp_dim=feat_dim)
+
         self.loss = symInfoNCE(self.cfg)
+        self.stage = stage
 
     def forward(self, X):
         return self.model(X)
+    
+    def make_classifier(self):
+        self.model.projection = nn.Identity()
+        self.classifier = nn.Linear(self.cfg.embedding_size, self.cfg.num_classes)
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.model.eval()
+        self.loss = nn.CrossEntropyLoss()
+        self.stage = "classification"
+    
+    def _shared_log_step(self, 
+                         mode: str, 
+                         metrics: dict,
+                         on_step: bool = True, 
+                         on_epoch: bool = False,):
+        """Shared log step."""
+        for key, value in metrics.items():
+            self.log(f"{mode}_{key}", 
+                     value, 
+                     on_step=on_step, 
+                     on_epoch=on_epoch)
 
     def training_step(self, batch, batch_idx):
-        (x1, x2), labels = batch
-        z1 = self.model(x1)
-        z2 = self.model(x2)
-        loss = self.loss(z1, z2, self.current_epoch)
-        self.log('contrastive_loss', 
-                 loss, 
-                 on_step=True, 
-                 on_epoch=True, 
-                 logger=True)
+        if self.stage == "self-supervised":
+            (x1, x2), labels = batch
+            z1 = self.model(x1)
+            z2 = self.model(x2)
+            loss = self.loss(z1, z2, self.current_epoch)
+            self.log('contrastive_loss', 
+                    loss, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+        else: 
+            x, y = batch
+            logits = self.forward(x)
+            loss = self.loss(logits, y)
+            self.log('classif_loss', 
+                    loss, 
+                    on_step=True,
+                    on_epoch=True, 
+                    prog_bar=True, 
+                    logger=True)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+        if self.stage == "self-supervised":
+            (x1, x2), labels = batch
+            z1 = self.model(x1)
+            z2 = self.model(x2)
+            loss = self.loss(z1, z2, self.current_epoch)
+            self.log('contrastive_loss', 
+                    loss, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+        else: 
+            x, y = batch
+            logits = self.forward(x)
+            loss = self.loss(logits, y)
+            self.log('classif_loss', 
+                    loss, 
+                    on_step=True,
+                    on_epoch=True, 
+                    prog_bar=True, 
+                    logger=True)
+        return loss
+    
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self.forward(x)
+        loss = self.loss(logits, y)
+        self.log('classif_loss', 
+                loss, 
+                on_step=True,
+                on_epoch=True, 
+                prog_bar=True, 
+                logger=True)
 
     def configure_optimizers(self):
         max_epochs = int(self.cfg.epochs)
         param_groups = define_param_groups(self.model, self.cfg.training.weight_decay, 'adam')
         lr = self.cfg.training.lr
         optimizer = Adam(param_groups, lr=lr, weight_decay=self.cfg.training.weight_decay)
-
         print(f'Optimizer Adam, '
               f'Learning Rate {lr}, '
               f'Effective batch size {self.cfg.batch_size * self.cfg.training.gradient_accumulation_steps}')
-
         scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, 
                                                          warmup_epochs=10, 
                                                          max_epochs=max_epochs,
                                                          warmup_start_lr=0.0)
-
         return [optimizer], [scheduler_warmup]
-
 
 
 class Encoder(nn.Module):
@@ -58,14 +123,12 @@ class Encoder(nn.Module):
        mlp_dim = default(mlp_dim, self.backbone.fc.in_features)
        print('Dim MLP input:',mlp_dim)
        self.backbone.fc = nn.Identity()
-
        self.projection = nn.Sequential(
            nn.Linear(in_features=mlp_dim, out_features=mlp_dim),
            nn.BatchNorm1d(mlp_dim),
            nn.ReLU(),
            nn.Linear(in_features=mlp_dim, out_features=embedding_size),
-           nn.BatchNorm1d(embedding_size),
-       )
+           nn.BatchNorm1d(embedding_size),)
 
    def forward(self, x, return_embedding=False):
        embedding = self.backbone(x)

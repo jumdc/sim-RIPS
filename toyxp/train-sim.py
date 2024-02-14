@@ -1,9 +1,7 @@
 import torch
 from datetime import datetime
 from pytorch_lightning import Trainer
-import os
 from pytorch_lightning.callbacks import GradientAccumulationScheduler
-from pytorch_lightning.callbacks import ModelCheckpoint
 from torchvision.models import  resnet18
 from omegaconf import DictConfig
 import pyrootutils
@@ -37,10 +35,21 @@ def train(cfg: DictConfig):
                       overfit_batches=cfg.overfit_batches,
                      gpus=cfg.gpu,
                      max_epochs=cfg.epochs)
-    trainer.fit(model, data_loader)
+    trainer.fit(model, data_loader['train'], data_loader['val'])
 
     ### Linear evaluation 
-    
+    model.make_classifier()
+    data_loader = get_stl_dataloader(root=cfg.stl10, 
+                                     batch_size=cfg.batch_size, 
+                                     transform=transform.test_transform,
+                                     split="train")
+    data_loader_test = get_stl_dataloader(root=cfg.stl10, 
+                                        batch_size=cfg.batch_size, 
+                                        transform=transform.test_transform,
+                                        split='test')
+    trainer.fit(model, data_loader['train'], data_loader['val'])
+    trainer.test(model, data_loader_test)
+
 
 if __name__ == "__main__":
     train()

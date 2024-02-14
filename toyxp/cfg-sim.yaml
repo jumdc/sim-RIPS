@@ -5,6 +5,7 @@ overfit_batches: 0
 seed: 77777 # randomness seed
 img_size: 96 #image shape
 save: "./saved_models/" # save checkpoint
+num_classes: 10
 load: False
 batch_size: 200
 embedding_size: 128 # papers value is 128

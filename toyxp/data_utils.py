@@ -49,6 +49,20 @@ def get_stl_dataloader(root,
                   split=split, 
                   transform=transform, 
                   download=True)
-    return DataLoader(dataset=stl10, 
-                      batch_size=batch_size, 
-                      num_workers=cpu_count()//2)
+    print(len(stl10))
+    if split == "unlabeled" or split=="train": 
+        # create batches
+        train_size = int(0.8 * len(stl10))
+        val_size = len(stl10) - train_size      
+        train_subset, val_subset = torch.utils.data.random_split(
+                                    stl10, 
+                                    [train_size, val_size], 
+                                    generator=torch.Generator().manual_seed(1))
+        train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_batches = DataLoader(val_subset, batch_size=batch_size, shuffle=True)
+        dataloader = {"train": train_dataloader, "val": val_batches}
+    else: 
+        dataloader = DataLoader(dataset=stl10, 
+                               batch_size=batch_size, 
+                               num_workers=cpu_count()//2)
+    return dataloader
