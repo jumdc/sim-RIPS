@@ -132,13 +132,19 @@ class SimCLR_pl(pl.LightningModule):
                                                             warmup_epochs=10, 
                                                             max_epochs=max_epochs,
                                                             warmup_start_lr=0.0)
+            configuration = {
+                "optimizer": optimizer,
+                "lr_scheduler": scheduler_warmup,}
         else:
             param_groups = define_param_groups(self.classifier, self.cfg.supervised.weight_decay, 'adam')
             lr = self.cfg.supervised.lr
             optimizer = Adam(param_groups, 
                             lr=lr, 
                             weight_decay=self.cfg.supervised.weight_decay)
-        return [optimizer], [scheduler_warmup]
+            configuration = {
+                "optimizer": optimizer,
+                }
+        return configuration
 
 
 class Encoder(nn.Module):

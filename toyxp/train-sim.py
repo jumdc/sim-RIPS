@@ -19,7 +19,7 @@ from data_utils import Augment, get_stl_dataloader
 
 @hydra.main(
     version_base="1.2",
-    config_path=root / "toyxp",
+    config_path=root / "config",
     config_name="cfg-sim.yaml",)
 def train(cfg: DictConfig):
     name = f"{datetime.now().strftime('%Y-%m-%d_%Hh%M')}_{cfg.prefix}"
@@ -39,30 +39,30 @@ def train(cfg: DictConfig):
     accumulator = GradientAccumulationScheduler(scheduling={0: cfg.self_supervised.gradient_accumulation_steps})
     trainer = Trainer(callbacks=[accumulator],
                     logger=logger,
-                    accelerator=cfg.accelerator,
+                    accelerator=cfg.trainer.accelerator,
                     overfit_batches=cfg.overfit_batches,
-                    gpus=cfg.gpu,
-                    max_epochs=cfg.epochs)
+                    gpus=cfg.trainer.gpu,
+                    max_epochs=cfg.self_supervised.epochs)
     trainer.fit(model, 
                 data_loader['train'], 
                 data_loader['val'])
 
     ### Linear evaluation 
     model.make_classifier()
-    data_loader = get_stl_dataloader(root=cfg.stl10, 
+    data_loader = get_stl_dataloader(root=cfg.paths.data, 
                                      batch_size=cfg.batch_size, 
                                      transform=transform.test_transform,
                                      split="train")
-    data_loader_test = get_stl_dataloader(root=cfg.stl10, 
+    data_loader_test = get_stl_dataloader(root=cfg.paths.data, 
                                         batch_size=cfg.batch_size, 
                                         transform=transform.test_transform,
                                         split='test')
     trainer_supervised = Trainer(callbacks=[],
                     logger=logger,
-                    accelerator=cfg.accelerator,
+                    accelerator=cfg.trainer.accelerator,
                     overfit_batches=cfg.overfit_batches,
-                    gpus=cfg.gpu,
-                    max_epochs=cfg.epochs)
+                    gpus=cfg.trainer.gpu,
+                    max_epochs=cfg.supervised.epochs)
     trainer_supervised.fit(model, 
                 data_loader['train'], 
                 data_loader['val'])
