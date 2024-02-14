@@ -6,6 +6,7 @@ from torchvision.models import  resnet18
 from omegaconf import DictConfig
 import pyrootutils
 import hydra
+from pytorch_lightning.loggers import WandbLogger
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -21,17 +22,24 @@ from data_utils import Augment, get_stl_dataloader
     config_path=root / "toyxp",
     config_name="cfg-sim.yaml",)
 def train(cfg: DictConfig):
-    name = "simclr" + cfg.prefix
+    name = f"{datetime.now().strftime('%Y-%m-%d_%Hh%M')}_{cfg.prefix}"
     model = SimCLR_pl(cfg, 
                       model=resnet18(pretrained=False), 
                       feat_dim=512)
     transform = Augment(cfg.img_size)
-    data_loader = get_stl_dataloader(root=cfg.stl10, 
+    data_loader = get_stl_dataloader(root=cfg.paths.data, 
                                      batch_size=cfg.batch_size, 
                                      transform=transform)
+    logger = (WandbLogger(name=name,
+                        dir=cfg.paths.logs,
+                        project=cfg.logger.project,
+                        log_model=True) if cfg.log else None)
+
     ### Self-supervised 
-    accumulator = GradientAccumulationScheduler(scheduling={0: cfg.training.gradient_accumulation_steps})
+    accumulator = GradientAccumulationScheduler(scheduling={0: cfg.self_supervised.gradient_accumulation_steps})
     trainer = Trainer(callbacks=[accumulator],
+                    logger=logger,
+                    accelerator=cfg.accelerator,
                     overfit_batches=cfg.overfit_batches,
                     gpus=cfg.gpu,
                     max_epochs=cfg.epochs)
@@ -49,10 +57,16 @@ def train(cfg: DictConfig):
                                         batch_size=cfg.batch_size, 
                                         transform=transform.test_transform,
                                         split='test')
-    trainer.fit(model, 
+    trainer_supervised = Trainer(callbacks=[],
+                    logger=logger,
+                    accelerator=cfg.accelerator,
+                    overfit_batches=cfg.overfit_batches,
+                    gpus=cfg.gpu,
+                    max_epochs=cfg.epochs)
+    trainer_supervised.fit(model, 
                 data_loader['train'], 
                 data_loader['val'])
-    trainer.test(model, 
+    trainer_supervised.test(model, 
                  data_loader_test)
 
 

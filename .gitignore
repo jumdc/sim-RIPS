@@ -8,10 +8,13 @@ __pycache__/
 
 ### custom additions
 ./saved_models/
+checkpoints/
+self-supervised-learning/
+wandb/
 
 lightning_logs/
 outputs/
-
+sel
 
 # Distribution / packaging
 .Python

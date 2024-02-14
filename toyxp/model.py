@@ -37,6 +37,7 @@ class SimCLR_pl(pl.LightningModule):
         self.stage = "classification"
         self.accuracy = Accuracy(task="multiclass", num_classes=self.cfg.num_classes)
         self.f1 = F1Score(task="multiclass", num_classes=self.cfg.num_classes)
+        self.configure_optimizers()
     
     def training_step(self, batch, batch_idx):
         if self.stage == "self-supervised":
@@ -76,6 +77,21 @@ class SimCLR_pl(pl.LightningModule):
             x, y = batch
             logits = self.forward(x)
             loss = self.loss(logits, y)
+            y_one_hot = F.one_hot(y, 
+                              num_classes=self.cfg.num_classes)
+            self.log('val_accuracy',
+                self.accuracy(logits, 
+                              y_one_hot),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True)
+            self.log('val_f1',
+                self.f1(logits, y_one_hot),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True)
             self.log('classif_loss', 
                     loss, 
                     on_step=True,
@@ -88,20 +104,16 @@ class SimCLR_pl(pl.LightningModule):
         x, y = batch
         logits = self.forward(x)
         loss = self.loss(logits, y)
-        y_one_hot = F.one_hot(y, num_classes=self.cfg.num_classes)
-        self.log('classif_loss', 
-                loss, 
-                on_step=True,
-                on_epoch=True, 
-                prog_bar=True, 
-                logger=True)
-        self.log('accuracy',
-                self.accuracy(logits, y_one_hot),
+        y_one_hot = F.one_hot(y, 
+                              num_classes=self.cfg.num_classes)
+        self.log('test_accuracy',
+                self.accuracy(logits, 
+                              y_one_hot),
                 on_step=True,
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
-        self.log('f1',
+        self.log('test_f1',
                 self.f1(logits, y_one_hot),
                 on_step=True,
                 on_epoch=True,
@@ -109,17 +121,23 @@ class SimCLR_pl(pl.LightningModule):
                 logger=True)
 
     def configure_optimizers(self):
-        max_epochs = int(self.cfg.epochs)
-        param_groups = define_param_groups(self.model, self.cfg.training.weight_decay, 'adam')
-        lr = self.cfg.training.lr
-        optimizer = Adam(param_groups, lr=lr, weight_decay=self.cfg.training.weight_decay)
-        print(f'Optimizer Adam, '
-              f'Learning Rate {lr}, '
-              f'Effective batch size {self.cfg.batch_size * self.cfg.training.gradient_accumulation_steps}')
-        scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, 
-                                                         warmup_epochs=10, 
-                                                         max_epochs=max_epochs,
-                                                         warmup_start_lr=0.0)
+        if self.stage == "self-supervised":
+            max_epochs = int(self.cfg.epochs)
+            param_groups = define_param_groups(self.model, self.cfg.self_supervised.weight_decay, 'adam')
+            lr = self.cfg.self_supervised.lr
+            optimizer = Adam(param_groups, 
+                            lr=lr, 
+                            weight_decay=self.cfg.self_supervised.weight_decay)
+            scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, 
+                                                            warmup_epochs=10, 
+                                                            max_epochs=max_epochs,
+                                                            warmup_start_lr=0.0)
+        else:
+            param_groups = define_param_groups(self.classifier, self.cfg.supervised.weight_decay, 'adam')
+            lr = self.cfg.supervised.lr
+            optimizer = Adam(param_groups, 
+                            lr=lr, 
+                            weight_decay=self.cfg.supervised.weight_decay)
         return [optimizer], [scheduler_warmup]
 
 
@@ -150,7 +168,7 @@ class symInfoNCE(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        logit_scale = torch.ones([]) * self.cfg.training.temperature
+        logit_scale = torch.ones([]) * self.cfg.self_supervised.temperature
         self.temperature = nn.Parameter(logit_scale)
 
     def forward(self, x_1, x_2, current_epoch=0):
