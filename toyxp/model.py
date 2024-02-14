@@ -15,7 +15,6 @@ class SimCLR_pl(pl.LightningModule):
         super().__init__()
         self.cfg = cfg
         self.model = Encoder(self.cfg, model=model, mlp_dim=feat_dim)
-
         self.loss = symInfoNCE(self.cfg)
         self.stage = stage
 
@@ -30,9 +29,10 @@ class SimCLR_pl(pl.LightningModule):
         self.model.projection = nn.Identity()
         self.classifier = nn.Linear(self.cfg.representation_size, 
                                     self.cfg.num_classes)
-        for param in self.model.parameters():
-            param.requires_grad = False
-        self.model.eval()
+        if self.cfg.self_supervised.pretrained:
+            for param in self.model.parameters():
+                param.requires_grad = False
+            self.model.eval()
         self.loss = nn.CrossEntropyLoss()
         self.stage = "classification"
         self.accuracy = Accuracy(task="multiclass", num_classes=self.cfg.num_classes)
@@ -77,17 +77,15 @@ class SimCLR_pl(pl.LightningModule):
             x, y = batch
             logits = self.forward(x)
             loss = self.loss(logits, y)
-            y_one_hot = F.one_hot(y, 
-                              num_classes=self.cfg.num_classes)
             self.log('val_accuracy',
                 self.accuracy(logits, 
-                              y_one_hot),
+                              y),
                 on_step=True,
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
             self.log('val_f1',
-                self.f1(logits, y_one_hot),
+                self.f1(logits, y),
                 on_step=True,
                 on_epoch=True,
                 prog_bar=True,
@@ -103,19 +101,17 @@ class SimCLR_pl(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
-        loss = self.loss(logits, y)
-        y_one_hot = F.one_hot(y, 
-                              num_classes=self.cfg.num_classes)
         self.log('test_accuracy',
                 self.accuracy(logits, 
-                              y_one_hot),
-                on_step=True,
+                              y),
+                on_step=False,
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
+        
         self.log('test_f1',
-                self.f1(logits, y_one_hot),
-                on_step=True,
+                self.f1(logits, y),
+                on_step=False,
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
@@ -186,6 +182,15 @@ class symInfoNCE(nn.Module):
         loss_2 = torch.nn.functional.cross_entropy(similarity.T, labels) 
         return (loss_1 + loss_2) / 2.0
     
+
+class vicREG(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        pass
+    
+    def forward(self, x, y):
+        pass
 
 def define_param_groups(model, weight_decay, optimizer_name):
    def exclude_from_wd_and_adaptation(name):
