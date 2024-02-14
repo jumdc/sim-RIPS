@@ -1,6 +1,9 @@
 import torch
 import torchvision.transforms as T
 from torchvision import transforms, datasets
+from torchvision.datasets import STL10
+from torch.utils.data import DataLoader
+from torch.multiprocessing import cpu_count
 
 class Augment:
     """
@@ -38,3 +41,14 @@ class Augment:
     def __call__(self, x):
         return self.train_transform(x), self.train_transform(x)
 
+def get_stl_dataloader(root, 
+                       batch_size, 
+                       transform=None,
+                       split="unlabeled"):
+    stl10 = STL10(root, 
+                  split=split, 
+                  transform=transform, 
+                  download=True)
+    return DataLoader(dataset=stl10, 
+                      batch_size=batch_size, 
+                      num_workers=cpu_count()//2)

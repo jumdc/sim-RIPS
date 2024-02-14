@@ -9,6 +9,9 @@ __pycache__/
 ### custom additions
 ./saved_models/
 
+lightning_logs/
+outputs/
+
 
 # Distribution / packaging
 .Python

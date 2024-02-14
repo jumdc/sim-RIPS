@@ -13,9 +13,8 @@ class SimCLR_pl(pl.LightningModule):
     def __init__(self, cfg, model=None, feat_dim=512):
         super().__init__()
         self.cfg = cfg
-        
-        self.model = Encoder(cfg, model=model, mlp_dim=feat_dim)
-        self.loss = symInfoNCE(cfg.batch_size, temperature=self.cfg)
+        self.model = Encoder(self.cfg, model=model, mlp_dim=feat_dim)
+        self.loss = symInfoNCE(self.cfg)
 
     def forward(self, X):
         return self.model(X)
@@ -24,21 +23,27 @@ class SimCLR_pl(pl.LightningModule):
         (x1, x2), labels = batch
         z1 = self.model(x1)
         z2 = self.model(x2)
-        loss = self.loss(z1, z2)
-        self.log('Contrastive loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        loss = self.loss(z1, z2, self.current_epoch)
+        self.log('contrastive_loss', 
+                 loss, 
+                 on_step=True, 
+                 on_epoch=True, 
+                 logger=True)
         return loss
 
     def configure_optimizers(self):
-        max_epochs = int(self.config.epochs)
-        param_groups = define_param_groups(self.model, self.config.weight_decay, 'adam')
-        lr = self.config.lr
-        optimizer = Adam(param_groups, lr=lr, weight_decay=self.config.weight_decay)
+        max_epochs = int(self.cfg.epochs)
+        param_groups = define_param_groups(self.model, self.cfg.training.weight_decay, 'adam')
+        lr = self.cfg.training.lr
+        optimizer = Adam(param_groups, lr=lr, weight_decay=self.cfg.training.weight_decay)
 
         print(f'Optimizer Adam, '
               f'Learning Rate {lr}, '
-              f'Effective batch size {self.config.batch_size * self.config.gradient_accumulation_steps}')
+              f'Effective batch size {self.cfg.batch_size * self.cfg.training.gradient_accumulation_steps}')
 
-        scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=10, max_epochs=max_epochs,
+        scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, 
+                                                         warmup_epochs=10, 
+                                                         max_epochs=max_epochs,
                                                          warmup_start_lr=0.0)
 
         return [optimizer], [scheduler_warmup]
@@ -54,7 +59,6 @@ class Encoder(nn.Module):
        print('Dim MLP input:',mlp_dim)
        self.backbone.fc = nn.Identity()
 
-       # add mlp projection head
        self.projection = nn.Sequential(
            nn.Linear(in_features=mlp_dim, out_features=mlp_dim),
            nn.BatchNorm1d(mlp_dim),
@@ -75,25 +79,10 @@ class symInfoNCE(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        logit_scale = torch.ones([]) * self.cfg.model.contrastive_loss.temperature
-        self.gamma = cfg.model.contrastive_loss.gamma
-        if cfg.model.contrastive_loss.learnable_scale and not cfg.model.contrastive_loss.cos:
-            self.temperature = nn.Parameter(logit_scale)
-        elif not cfg.model.contrastive_loss.cos : 
-            self.temperature = logit_scale
-        else :
-            self.temperature_max = self.cfg.model.contrastive_loss.temperature_max
-            self.temperature_min = self.cfg.model.contrastive_loss.temperature_min
-            self.period = self.cfg.model.contrastive_loss.period
+        logit_scale = torch.ones([]) * self.cfg.training.temperature
+        self.temperature = nn.Parameter(logit_scale)
 
     def forward(self, x_1, x_2, current_epoch=0):
-        if self.gamma != 0:
-            x_1 = torch.nn.functional.normalize(x_1, dim=-1, p=2)
-            x_2 = torch.nn.functional.normalize(x_2, dim=-1, p=2)
-            noise_to_add = torch.normal(0, 1, size=x_1.shape, device=x_1.device)
-            x_1 = x_1 + noise_to_add * self.gamma
-            noise_to_add_2 = torch.normal(0, 1, size=x_2.shape, device=x_2.device)
-            x_2 = x_2 + noise_to_add_2 * self.gamma
         x_1 = torch.nn.functional.normalize(x_1, dim=-1, p=2)
         x_2 = torch.nn.functional.normalize(x_2, dim=-1, p=2)
         labels = torch.arange(x_1.shape[0], device=x_1.device) # entries on the diagonal
