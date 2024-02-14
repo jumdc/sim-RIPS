@@ -9,6 +9,7 @@ num_classes: 10
 load: False
 batch_size: 200
 embedding_size: 128 # papers value is 128
+representation_size: 512
 stl10: /home/jmordacq/Documents/IRBA/misc/datasets
 gpu: False
 training: {"temperature": 0.07,"lr": 3e-4,"weight_decay": 1e-6,"gradient_accumulation_steps":5}

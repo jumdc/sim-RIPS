@@ -6,7 +6,7 @@ from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import SGD, Adam
 from utils import default
 import torchvision.models as models
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, F1Score
 
 from torch import einsum
 
@@ -20,29 +20,24 @@ class SimCLR_pl(pl.LightningModule):
         self.stage = stage
 
     def forward(self, X):
-        return self.model(X)
+        if self.stage == "self-supervised":
+            output =  self.model(X)
+        else :
+            output = self.classifier(self.model(X))
+        return output
     
     def make_classifier(self):
         self.model.projection = nn.Identity()
-        self.classifier = nn.Linear(self.cfg.embedding_size, self.cfg.num_classes)
+        self.classifier = nn.Linear(self.cfg.representation_size, 
+                                    self.cfg.num_classes)
         for param in self.model.parameters():
             param.requires_grad = False
         self.model.eval()
         self.loss = nn.CrossEntropyLoss()
         self.stage = "classification"
+        self.accuracy = Accuracy(task="multiclass", num_classes=self.cfg.num_classes)
+        self.f1 = F1Score(task="multiclass", num_classes=self.cfg.num_classes)
     
-    def _shared_log_step(self, 
-                         mode: str, 
-                         metrics: dict,
-                         on_step: bool = True, 
-                         on_epoch: bool = False,):
-        """Shared log step."""
-        for key, value in metrics.items():
-            self.log(f"{mode}_{key}", 
-                     value, 
-                     on_step=on_step, 
-                     on_epoch=on_epoch)
-
     def training_step(self, batch, batch_idx):
         if self.stage == "self-supervised":
             (x1, x2), labels = batch
@@ -93,11 +88,24 @@ class SimCLR_pl(pl.LightningModule):
         x, y = batch
         logits = self.forward(x)
         loss = self.loss(logits, y)
+        y_one_hot = F.one_hot(y, num_classes=self.cfg.num_classes)
         self.log('classif_loss', 
                 loss, 
                 on_step=True,
                 on_epoch=True, 
                 prog_bar=True, 
+                logger=True)
+        self.log('accuracy',
+                self.accuracy(logits, y_one_hot),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True)
+        self.log('f1',
+                self.f1(logits, y_one_hot),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
                 logger=True)
 
     def configure_optimizers(self):
