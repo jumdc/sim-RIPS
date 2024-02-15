@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --time=10:00:00
+#SBATCH --time=06:00:00
 #SBATCH --job-name=clr
 #SBATCH --output=/gpfswork/rech/oyr/urt67oj/out/simCLR.out
 #SBATCH --partition=gpu_p2
