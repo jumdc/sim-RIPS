@@ -1,2 +1,2 @@
 data: "/gpfsdswork/dataset/"
-log: ""
+logs: "/gpfswork/rech/oyr/urt67oj/wandb_logs"
