@@ -33,8 +33,15 @@ class SimCLR_pl(pl.LightningModule):
             self.model.eval()
         self.loss = nn.CrossEntropyLoss()
         self.stage = "classification"
-        self.accuracy = Accuracy(task="multiclass", num_classes=self.cfg.num_classes)
-        self.f1 = F1Score(task="multiclass", num_classes=self.cfg.num_classes)
+        task = "multiclass"
+        average = "macro"
+        metric_params = {"task":task, 
+                         "num_classes": 10, 
+                        "average": average, 
+                        "top_k": 1}
+        ### Metric objects for calculating and averaging accuracy across batches
+        self.accuracy = Accuracy(**metric_params)
+        self.f1 = F1Score(**metric_params)
         self.configure_optimizers()
     
     def training_step(self, batch, batch_idx):
