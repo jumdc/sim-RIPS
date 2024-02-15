@@ -2,5 +2,6 @@
 
 
 # TODO 
-- [ ] simCLR
+- [x] simCLR
 - [ ] vicREG
+- [ ] wasserstein

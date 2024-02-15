@@ -2,12 +2,10 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import SGD, Adam
-from utils import default
+from utils.helpers import default, CosineWarmupScheduler
 import torchvision.models as models
 from torchmetrics import Accuracy, F1Score
-
 from torch import einsum
 
 class SimCLR_pl(pl.LightningModule):
@@ -124,13 +122,13 @@ class SimCLR_pl(pl.LightningModule):
             optimizer = Adam(param_groups, 
                             lr=lr, 
                             weight_decay=self.cfg.self_supervised.weight_decay)
-            scheduler_warmup = LinearWarmupCosineAnnealingLR(optimizer, 
-                                                            warmup_epochs=10, 
-                                                            max_epochs=max_epochs,
-                                                            warmup_start_lr=0.0)
+            scheduler = CosineWarmupScheduler(optimizer, 
+                            epoch_warmup=10, 
+                            max_epoch=max_epochs,
+                            min_lr=0.0)
             configuration = {
                 "optimizer": optimizer,
-                "lr_scheduler": scheduler_warmup,}
+                "lr_scheduler": scheduler,}
         else:
             param_groups = define_param_groups(self.classifier, self.cfg.supervised.weight_decay, 'adam')
             lr = self.cfg.supervised.lr

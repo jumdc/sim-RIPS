@@ -16,6 +16,8 @@ lightning_logs/
 outputs/
 sel
 
+rips/figs
+
 # Distribution / packaging
 .Python
 build/

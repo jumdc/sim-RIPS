@@ -1,3 +1,5 @@
+___config_name___: cpu
 accelerator: cpu
 gpu: False
 strategy: auto
+devices: 1

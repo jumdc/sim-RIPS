@@ -1,3 +1,4 @@
+___config_name___: gpu
 accelerator: gpu
-gpu: 1
 strategy: auto
+devices: 1

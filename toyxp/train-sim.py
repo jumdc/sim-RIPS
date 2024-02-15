@@ -2,7 +2,6 @@ import torch
 import os
 from datetime import datetime
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import GradientAccumulationScheduler
 from torchvision.models import  resnet18
 from omegaconf import DictConfig
 import pyrootutils
@@ -41,11 +40,11 @@ def train(cfg: DictConfig):
                         project=cfg.logger.project,
                         log_model=True) 
                         if cfg.log else None)
-
+    progress_bar = False if cfg.trainer.___config_name___ == "jz" else True 
     ### Self-supervised 
     if cfg.self_supervised.pretrained:
         trainer = Trainer(logger=logger,
-                        strategy=cfg.trainer.strategy,
+                        enable_progress_bar=progress_bar,
                         overfit_batches=cfg.overfit_batches,
                         accelerator=cfg.trainer.accelerator,
                         gpus=cfg.trainer.devices,
@@ -67,11 +66,12 @@ def train(cfg: DictConfig):
                                         split='test',
                                         num_workers=cfg.num_workers)
     trainer_supervised = Trainer(callbacks=[],
-                    logger=logger,
-                    overfit_batches=cfg.overfit_batches,
-                    accelerator=cfg.trainer.accelerator,
-                    gpus=cfg.trainer.devices,
-                    max_epochs=cfg.supervised.epochs)
+                                 enable_progress_bar=progress_bar,
+                                logger=logger,
+                                overfit_batches=cfg.overfit_batches,
+                                accelerator=cfg.trainer.accelerator,
+                                gpus=cfg.trainer.devices,
+                                max_epochs=cfg.supervised.epochs)
     trainer_supervised.fit(model, 
                 data_loader['train'], 
                 data_loader['val'])
