@@ -32,6 +32,7 @@ def train(cfg: DictConfig):
                       feat_dim=512)
     transform = Augment(cfg.img_size)
     data_loader = get_stl_dataloader(root=cfg.paths.data, 
+                                     dataset=cfg.dataset,
                                      batch_size=cfg.batch_size, 
                                      transform=transform,
                                      num_workers=cfg.num_workers,)
@@ -40,11 +41,11 @@ def train(cfg: DictConfig):
                         project=cfg.logger.project,
                         log_model=True) 
                         if cfg.log else None)
-    progress_bar = False if cfg.trainer.___config_name___ == "jz" else True 
+
     ### Self-supervised 
     if cfg.self_supervised.pretrained:
         trainer = Trainer(logger=logger,
-                        enable_progress_bar=progress_bar,
+                        strategy=cfg.trainer.strategy,
                         overfit_batches=cfg.overfit_batches,
                         accelerator=cfg.trainer.accelerator,
                         gpus=cfg.trainer.devices,
@@ -56,17 +57,20 @@ def train(cfg: DictConfig):
     ### Linear evaluation 
     model.make_classifier()
     data_loader = get_stl_dataloader(root=cfg.paths.data, 
+                                     dataset=cfg.dataset,
                                      batch_size=cfg.supervised.batch_size, 
                                      transform=transform.test_transform,
                                      split="train",
                                      num_workers=cfg.num_workers)
+    
     data_loader_test = get_stl_dataloader(root=cfg.paths.data, 
+                                        dataset=cfg.dataset,
                                         batch_size=cfg.supervised.batch_size, 
                                         transform=transform.test_transform,
                                         split='test',
                                         num_workers=cfg.num_workers)
+    
     trainer_supervised = Trainer(callbacks=[],
-                                 enable_progress_bar=progress_bar,
                                 logger=logger,
                                 overfit_batches=cfg.overfit_batches,
                                 accelerator=cfg.trainer.accelerator,
