@@ -44,11 +44,11 @@ def train(cfg: DictConfig):
 
     ### Self-supervised 
     if cfg.self_supervised.pretrained:
-        trainer = Trainer(
-                        logger=logger,
-                        accelerator=cfg.trainer.accelerator,
+        trainer = Trainer(logger=logger,
+                        strategy=cfg.trainer.strategy,
                         overfit_batches=cfg.overfit_batches,
-                        gpus=cfg.trainer.gpu,
+                        accelerator=cfg.trainer.accelerator,
+                        gpus=cfg.trainer.devices,
                         max_epochs=cfg.self_supervised.epochs)
         trainer.fit(model, 
                     data_loader['train'], 
@@ -68,9 +68,9 @@ def train(cfg: DictConfig):
                                         num_workers=cfg.num_workers)
     trainer_supervised = Trainer(callbacks=[],
                     logger=logger,
-                    accelerator=cfg.trainer.accelerator,
                     overfit_batches=cfg.overfit_batches,
-                    gpus=cfg.trainer.gpu,
+                    accelerator=cfg.trainer.accelerator,
+                    gpus=cfg.trainer.devices,
                     max_epochs=cfg.supervised.epochs)
     trainer_supervised.fit(model, 
                 data_loader['train'], 

@@ -1,2 +1,3 @@
 accelerator: gpu
 gpu: 1
+strategy: auto

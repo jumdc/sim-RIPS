@@ -1,2 +1,3 @@
 accelerator: cpu
 gpu: False
+strategy: auto

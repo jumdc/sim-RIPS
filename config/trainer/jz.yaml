@@ -1,0 +1,5 @@
+___config_name___: jz
+stratedy: ddp
+accelerator: gpu
+devices: 6
+gradient_clip_val: null
