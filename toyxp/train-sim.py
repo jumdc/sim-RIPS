@@ -1,4 +1,5 @@
 import torch
+import os
 from datetime import datetime
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import GradientAccumulationScheduler
@@ -22,6 +23,10 @@ from data_utils import Augment, get_stl_dataloader
     config_path=root / "config",
     config_name="cfg-sim.yaml",)
 def train(cfg: DictConfig):
+    if cfg.logger.mode == "offline":
+        os.environ["WANDB_MODE"] = "offline"
+        os.environ['WANDB_DIR'] = cfg.paths.logs
+
     name = f"{cfg.prefix}_{datetime.now().strftime('%Y-%m-%d_%Hh%M')}"
     model = SimCLR_pl(cfg, 
                       model=resnet18(pretrained=False), 
@@ -29,16 +34,16 @@ def train(cfg: DictConfig):
     transform = Augment(cfg.img_size)
     data_loader = get_stl_dataloader(root=cfg.paths.data, 
                                      batch_size=cfg.batch_size, 
-                                     transform=transform)
+                                     transform=transform,
+                                     num_workers=cfg.num_workers,)
     logger = (WandbLogger(name=name,
-                        dir=cfg.paths.logs,
+                        id=name,
                         project=cfg.logger.project,
                         log_model=True) 
                         if cfg.log else None)
 
     ### Self-supervised 
     if cfg.self_supervised.pretrained:
-        # accumulator = GradientAccumulationScheduler(scheduling={0: cfg.self_supervised.gradient_accumulation_steps})
         trainer = Trainer(
                         logger=logger,
                         accelerator=cfg.trainer.accelerator,
@@ -54,11 +59,13 @@ def train(cfg: DictConfig):
     data_loader = get_stl_dataloader(root=cfg.paths.data, 
                                      batch_size=cfg.supervised.batch_size, 
                                      transform=transform.test_transform,
-                                     split="train")
+                                     split="train",
+                                     num_workers=cfg.num_workers)
     data_loader_test = get_stl_dataloader(root=cfg.paths.data, 
                                         batch_size=cfg.supervised.batch_size, 
                                         transform=transform.test_transform,
-                                        split='test')
+                                        split='test',
+                                        num_workers=cfg.num_workers)
     trainer_supervised = Trainer(callbacks=[],
                     logger=logger,
                     accelerator=cfg.trainer.accelerator,

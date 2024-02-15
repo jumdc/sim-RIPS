@@ -44,12 +44,12 @@ class Augment:
 def get_stl_dataloader(root, 
                        batch_size, 
                        transform=None,
-                       split="unlabeled"):
+                       split="unlabeled",
+                       num_workers=cpu_count()//2):
     stl10 = STL10(root, 
                   split=split, 
                   transform=transform, 
                   download=True)
-    print(len(stl10))
     if split == "unlabeled" or split=="train": 
         # create batches
         train_size = int(0.8 * len(stl10))
@@ -64,5 +64,5 @@ def get_stl_dataloader(root,
     else: 
         dataloader = DataLoader(dataset=stl10, 
                                batch_size=batch_size, 
-                               num_workers=cpu_count()//2)
+                               num_workers=num_workers)
     return dataloader
