@@ -15,7 +15,7 @@ load: False
 batch_size: 1024
 embedding_size: 512
 representation_size: 512
-self_supervised: {"pretrained":True,"temperature": 0.07, "lr": 1e-4,"weight_decay": 0.001,"warm_up":True,"epochs":100}
+self_supervised: {"loss":"infoNCE","pretrained":True,"temperature": 0.07, "lr": 1e-4,"weight_decay": 0.001,"warm_up":True,"epochs":100,"cov_coef":0.04}
 supervised: {"lr": 1e-4, "weight_decay": 0.001,"gradient_accumulation_steps":0,"epochs":100,"batch_size":128}
 log: False
 num_workers: 4

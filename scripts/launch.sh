@@ -8,4 +8,5 @@ python toyxp/train-sim.py \
 ++log=True \
 ++batch_size=128 \
 ++num_workers=30 \
-++log=False
+++log=False \
+++self_supervised.loss=vicREG

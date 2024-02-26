@@ -6,14 +6,15 @@ from torch.optim import SGD, Adam
 from utils.helpers import default, CosineWarmupScheduler
 import torchvision.models as models
 from torchmetrics import Accuracy, F1Score
-from torch import einsum
+
+from utils.losses import symInfoNCE, vicREG
 
 class SimCLR_pl(pl.LightningModule):
     def __init__(self, cfg, model=None, feat_dim=512, stage="self-supervised"):
         super().__init__()
         self.cfg = cfg
         self.model = Encoder(self.cfg, model=model, mlp_dim=feat_dim)
-        self.loss = symInfoNCE(self.cfg)
+        self.loss = symInfoNCE(self.cfg) if self.cfg.self_supervised.loss == "simclr" else vicREG(self.cfg)
         self.stage = stage
 
     def forward(self, X):
@@ -46,7 +47,7 @@ class SimCLR_pl(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         if self.stage == "self-supervised":
-            (x1, x2), labels = batch
+            (x1, x2), _ = batch
             z1 = self.model(x1)
             z2 = self.model(x2)
             loss = self.loss(z1, z2, self.current_epoch)
@@ -113,7 +114,6 @@ class SimCLR_pl(pl.LightningModule):
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
-        
         self.log('test_f1',
                 self.f1(logits, y),
                 on_step=False,
@@ -124,7 +124,9 @@ class SimCLR_pl(pl.LightningModule):
     def configure_optimizers(self):
         if self.stage == "self-supervised":
             max_epochs = int(self.cfg.epochs)
-            param_groups = define_param_groups(self.model, self.cfg.self_supervised.weight_decay, 'adam')
+            param_groups = define_param_groups(self.model, 
+                                               self.cfg.self_supervised.weight_decay, 
+                                               'adam')
             lr = self.cfg.self_supervised.lr
             optimizer = Adam(param_groups, 
                             lr=lr, 
@@ -137,7 +139,9 @@ class SimCLR_pl(pl.LightningModule):
                 "optimizer": optimizer,
                 "lr_scheduler": scheduler,}
         else:
-            param_groups = define_param_groups(self.classifier, self.cfg.supervised.weight_decay, 'adam')
+            param_groups = define_param_groups(self.classifier, 
+                                               self.cfg.supervised.weight_decay, 
+                                               'adam')
             lr = self.cfg.supervised.lr
             optimizer = Adam(param_groups, 
                             lr=lr, 
@@ -170,32 +174,8 @@ class Encoder(nn.Module):
        return self.projection(embedding)
    
 
-class symInfoNCE(nn.Module):
-    """symmetric infoNCE loss, aka same scheme than in ImageBind"""
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-        logit_scale = torch.ones([]) * self.cfg.self_supervised.temperature
-        self.temperature = nn.Parameter(logit_scale)
 
-    def forward(self, x_1, x_2, current_epoch=0):
-        x_1 = torch.nn.functional.normalize(x_1, dim=-1, p=2)
-        x_2 = torch.nn.functional.normalize(x_2, dim=-1, p=2)
-        labels = torch.arange(x_1.shape[0], device=x_1.device) # entries on the diagonal
-        similarity = einsum('i d, j d -> i j', x_1, x_2) / self.temperature
-        loss_1 = torch.nn.functional.cross_entropy(similarity, labels) 
-        loss_2 = torch.nn.functional.cross_entropy(similarity.T, labels) 
-        return (loss_1 + loss_2) / 2.0
-    
 
-class vicREG(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-        pass
-    
-    def forward(self, x, y):
-        pass
 
 def define_param_groups(model, weight_decay, optimizer_name):
    def exclude_from_wd_and_adaptation(name):
@@ -203,17 +183,14 @@ def define_param_groups(model, weight_decay, optimizer_name):
            return True
        if optimizer_name == 'lars' and 'bias' in name:
            return True
-
+       
    param_groups = [
-       {
-           'params': [p for name, p in model.named_parameters() if not exclude_from_wd_and_adaptation(name)],
-           'weight_decay': weight_decay,
-           'layer_adaptation': True,
+       {'params': [p for name, p in model.named_parameters() if not exclude_from_wd_and_adaptation(name)],
+        'weight_decay': weight_decay,
+        'layer_adaptation': True,
        },
-       {
-           'params': [p for name, p in model.named_parameters() if exclude_from_wd_and_adaptation(name)],
-           'weight_decay': 0.,
-           'layer_adaptation': False,
-       },
-   ]
+       {'params': [p for name, p in model.named_parameters() if exclude_from_wd_and_adaptation(name)],
+        'weight_decay': 0.,
+        'layer_adaptation': False,
+       },]
    return param_groups
