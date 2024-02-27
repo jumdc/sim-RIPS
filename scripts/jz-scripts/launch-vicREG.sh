@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --time=06:00:00
+#SBATCH --time=03:00:00
 #SBATCH --job-name=vic
 #SBATCH --output=/gpfswork/rech/oyr/urt67oj/out/vic.out
 #SBATCH --partition=gpu_p2
@@ -20,9 +20,9 @@ conda activate multimodal
 python toyxp/train-sim.py \
 paths=jz \
 trainer=jz \
-++prefix=vicREG \
+++prefix=vicREG-200 \
 ++self_supervised.pretrained=True \
-++self_supervised.epochs=100 \
+++self_supervised.epochs=200 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \

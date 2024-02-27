@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from torch import einsum
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+from pytorch_lightning.loggers import WandbLogger
+
+from torch_topological.nn import VietorisRipsComplex, WassersteinDistance
 
 class symInfoNCE(nn.Module):
     """symmetric infoNCE loss, aka same scheme than in ImageBind"""
@@ -56,3 +61,51 @@ def off_diagonal(x):
     n, m = x.shape
     assert n == m
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
+
+class TopologicalLoss(nn.Module):
+    def __init__(self, cfg, logger):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        
+        self.rips_1 = VietorisRipsComplex(cfg['self_supervised']['max_edge_length'], 
+                                          cfg['self_supervised']['max_dim'])
+        self.rips_2 = VietorisRipsComplex(cfg['self_supervised']['max_edge_length'], 
+                                          cfg['self_supervised']['max_dim'])
+        
+        self.distance = WassersteinDistance()
+        self.logger = logger
+
+    def forward(self, x_1, x_2, plot, *args, **kwargs):
+        representation_loss = self.mse(x_1, x_2)
+        pi_1 = self.rips_1(x_1)
+        pi_2 = self.rips_2(x_2)
+        if plot and isinstance(self.logger, WandbLogger):
+            fig = plot_diagram(pi_1, pi_2)
+            self.logger.experiment.log({f"pi": fig})
+        topological_loss = self.distance(pi_1, pi_2)
+        return representation_loss + topological_loss
+    
+
+def plot_diagram(pi):
+    fig, axs = plt.subplots(constrained_layout=True, 
+                            ncols=2,
+                            figsize=(10, 10))
+
+    markers = ['o', 'x']
+
+    for dim in range(len(pi)):
+        diag = pi[dim]
+        if len(diag) > 0:
+            diag = diag.detach().cpu().numpy()
+            ax.scatter(diag[:, 0], diag[:, 1], label=f"$H_{dim}$")
+    ax.legend()
+
+    fig.canvas.draw_idle()
+    roc_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    roc_plot = roc_plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    plt.close("all")
+    roc_plot = np.expand_dims(roc_plot, axis=0)
+    roc_plot = torch.from_numpy(roc_plot / 255)
+    
+    
