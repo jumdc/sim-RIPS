@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+import pytorch_lightning as pl
 
 
 def default(val, def_val):
@@ -50,3 +50,19 @@ class CosineWarmupScheduler(torch.optim.lr_scheduler._LRScheduler):
             lr_factor *= epoch * 1.0 / self.warmup
         return lr_factor
     
+class SizeDatamodule(pl.callbacks.Callback):       
+    def on_train_start(self, trainer: "pl.Trainer", 
+                             pl_module:  "pl.LightningModule") -> None:
+        """At each epoch start, log the size of the train set."""
+        if pl_module.logger:
+            pl_module.logger.log_metrics(
+                {"train-size": print(len(trainer.train_dataloader)),
+                 "val-size": len(trainer.val_dataloaders[0])},
+                                         step=0)
+
+    def on_test_start(self, trainer: "pl.Trainer", 
+                      pl_module: "pl.LightningModule") -> None:
+        """At each test start, log the size of the test set."""
+        if pl_module.logger:
+            pl_module.logger.log_metrics({"test-size":len(trainer.test_dataloaders[0])},
+                                         step=0)

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 from pytorch_lightning.loggers import WandbLogger
-
+import wandb
 from torch_topological.nn import VietorisRipsComplex, WassersteinDistance
 
 class symInfoNCE(nn.Module):
@@ -16,7 +16,7 @@ class symInfoNCE(nn.Module):
         logit_scale = torch.ones([]) * self.cfg.self_supervised.temperature
         self.temperature = nn.Parameter(logit_scale)
 
-    def forward(self, x_1, x_2, current_epoch=0):
+    def forward(self, x_1, x_2, *args, **kwargs):
         x_1 = torch.nn.functional.normalize(x_1, dim=-1, p=2)
         x_2 = torch.nn.functional.normalize(x_2, dim=-1, p=2)
         labels = torch.arange(x_1.shape[0], device=x_1.device) # entries on the diagonal
@@ -68,44 +68,71 @@ class TopologicalLoss(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
         
-        self.rips_1 = VietorisRipsComplex(cfg['self_supervised']['max_edge_length'], 
-                                          cfg['self_supervised']['max_dim'])
-        self.rips_2 = VietorisRipsComplex(cfg['self_supervised']['max_edge_length'], 
-                                          cfg['self_supervised']['max_dim'])
+        self.rips_1 = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
+        self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
         
-        self.distance = WassersteinDistance()
+        self.distance = WassersteinDistance(p=1)
         self.logger = logger
 
-    def forward(self, x_1, x_2, plot, *args, **kwargs):
+    def forward(self, x_1, x_2, *args, **kwargs):
         representation_loss = self.mse(x_1, x_2)
         pi_1 = self.rips_1(x_1)
         pi_2 = self.rips_2(x_2)
-        if plot and isinstance(self.logger, WandbLogger):
+        if (len(args) > 0 
+            and args[0]
+            and isinstance(self.logger, WandbLogger)):
+            print("here")
             fig = plot_diagram(pi_1, pi_2)
-            self.logger.experiment.log({f"pi": fig})
+            self.logger.experiment.log({f"persistent_diagram": wandb.Image(fig)})
         topological_loss = self.distance(pi_1, pi_2)
         return representation_loss + topological_loss
     
 
-def plot_diagram(pi):
+def plot_diagram(pi, pi_2):
     fig, axs = plt.subplots(constrained_layout=True, 
                             ncols=2,
-                            figsize=(10, 10))
-
-    markers = ['o', 'x']
+                            figsize=(15, 10))
+    max_x_1, max_y_1, max_x_2, max_y_2 = 0, 0, 0, 0
 
     for dim in range(len(pi)):
-        diag = pi[dim]
+        diag = pi[dim].diagram.detach().cpu().numpy()
+        diag_2 = pi_2[dim].diagram.detach().cpu().numpy()
         if len(diag) > 0:
-            diag = diag.detach().cpu().numpy()
-            ax.scatter(diag[:, 0], diag[:, 1], label=f"$H_{dim}$")
-    ax.legend()
+            max_x_1 = max(max_x_1, np.max(diag[:,0]))
+            max_y_1 = max(max_y_1, np.max(diag[:,1]))
+            axs[0].scatter(diag[:, 0], 
+                           diag[:, 1], 
+                           label=f"$H_{dim}$ - number of points: {diag.shape[0]}")
+        if len(diag_2) > 0:
+            max_x_2 = max(max_x_2, np.max(diag_2[:,0]))
+            max_y_2 = max(max_y_2, np.max(diag_2[:,1]))
+            axs[1].scatter(diag_2[:, 0], 
+                           diag_2[:, 1], 
+                           label=f"$H_{dim}$ - number of points: {diag_2.shape[0]}")
+
+    axs[0].set_title("Persistent Diagram - view 1")
+    axs[0].set_xlim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
+    axs[0].set_ylim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
+    axs[0].plot([0,  max(max_y_1, max_y_2)],[0,  max(max_y_1, max_y_2)], c="lightgrey") # diagonal
+    
+    axs[0].set_xlabel("Birth")
+    axs[0].set_ylabel("Death")
+    axs[0].legend()
+
+    axs[1].set_title("Persistent Diagram - view 2")
+    axs[1].set_xlim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
+    axs[1].set_ylim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
+    axs[1].plot([0, max(max_y_1, max_y_2)],[0,  max(max_y_1, max_y_2)], c="lightgrey") # diagonal
+
+    axs[1].set_xlabel("Birth")
+    axs[1].set_ylabel("Death")
+    axs[1].legend()
 
     fig.canvas.draw_idle()
-    roc_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    roc_plot = roc_plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    pd = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    pd = pd.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close("all")
-    roc_plot = np.expand_dims(roc_plot, axis=0)
-    roc_plot = torch.from_numpy(roc_plot / 255)
+    pd = np.expand_dims(pd, axis=0) 
+    return pd
     
     

@@ -7,15 +7,45 @@ from utils.helpers import default, CosineWarmupScheduler
 import torchvision.models as models
 from torchmetrics import Accuracy, F1Score
 
-from utils.losses import symInfoNCE, vicREG
+from utils.losses import symInfoNCE, vicREG, TopologicalLoss
 
 class SimCLR_pl(pl.LightningModule):
     def __init__(self, cfg, model=None, feat_dim=512, stage="self-supervised"):
         super().__init__()
         self.cfg = cfg
         self.model = Encoder(self.cfg, model=model, mlp_dim=feat_dim)
-        self.loss = symInfoNCE(self.cfg) if self.cfg.self_supervised.loss == "simclr" else vicREG(self.cfg)
+        
         self.stage = stage
+
+    def setup(self, stage: str) -> None:
+        if self.stage == "self-supervised":
+            if self.cfg.self_supervised.loss == "simclr":
+                self.loss = symInfoNCE(self.cfg)
+            elif self.cfg.self_supervised.loss == "vicreg":
+                self.loss = vicREG(self.cfg)
+            elif self.cfg.self_supervised.loss == "topo":
+                self.loss = TopologicalLoss(self.cfg, 
+                                            logger=self.logger)
+        else:
+            self.model.projection = nn.Identity()
+            self.classifier = nn.Linear(self.cfg.representation_size, 
+                                        self.cfg.num_classes)
+            if self.cfg.self_supervised.pretrained:
+                for param in self.model.parameters():
+                    param.requires_grad = False
+                self.model.eval()
+            self.loss = nn.CrossEntropyLoss()
+            self.stage = "classification"
+            task = "multiclass"
+            average = "macro"
+            metric_params = {"task":task, 
+                            "num_classes": 10, 
+                            "average": average, 
+                            "top_k": 1}
+            ### Metric objects for calculating and averaging accuracy across batches
+            self.accuracy = Accuracy(**metric_params)
+            self.f1 = F1Score(**metric_params)
+            self.configure_optimizers()
 
     def forward(self, X):
         if self.stage == "self-supervised":
@@ -24,33 +54,14 @@ class SimCLR_pl(pl.LightningModule):
             output = self.classifier(self.model(X))
         return output
     
-    def make_classifier(self):
-        self.model.projection = nn.Identity()
-        self.classifier = nn.Linear(self.cfg.representation_size, 
-                                    self.cfg.num_classes)
-        if self.cfg.self_supervised.pretrained:
-            for param in self.model.parameters():
-                param.requires_grad = False
-            self.model.eval()
-        self.loss = nn.CrossEntropyLoss()
-        self.stage = "classification"
-        task = "multiclass"
-        average = "macro"
-        metric_params = {"task":task, 
-                         "num_classes": 10, 
-                        "average": average, 
-                        "top_k": 1}
-        ### Metric objects for calculating and averaging accuracy across batches
-        self.accuracy = Accuracy(**metric_params)
-        self.f1 = F1Score(**metric_params)
-        self.configure_optimizers()
-    
     def training_step(self, batch, batch_idx):
         if self.stage == "self-supervised":
             (x1, x2), _ = batch
             z1 = self.model(x1)
             z2 = self.model(x2)
-            loss = self.loss(z1, z2, self.current_epoch)
+            loss = self.loss(z1, 
+                             z2, 
+                            False)
             self.log('contrastive_loss', 
                     loss, 
                     on_step=True, 
@@ -73,7 +84,11 @@ class SimCLR_pl(pl.LightningModule):
             (x1, x2), labels = batch
             z1 = self.model(x1)
             z2 = self.model(x2)
-            loss = self.loss(z1, z2, self.current_epoch)
+            loss = self.loss(z1, 
+                             z2, 
+                            (True 
+                             if (self.current_epoch % 10 == 0 and batch_idx == 0) 
+                             else False))
             self.log('contrastive_loss', 
                     loss, 
                     on_step=True, 
@@ -131,10 +146,15 @@ class SimCLR_pl(pl.LightningModule):
             optimizer = Adam(param_groups, 
                             lr=lr, 
                             weight_decay=self.cfg.self_supervised.weight_decay)
-            scheduler = CosineWarmupScheduler(optimizer, 
-                            epoch_warmup=10, 
-                            max_epoch=max_epochs,
-                            min_lr=0.0)
+            if self.cfg.self_supervised.loss == "cosine":
+                scheduler = CosineWarmupScheduler(optimizer, 
+                                epoch_warmup=10, 
+                                max_epoch=max_epochs,
+                                min_lr=0.0)
+            elif self.cfg.self_supervised.loss == "topo":
+                scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                                              lambda epoch: 1./(epoch + 1))
+
             configuration = {
                 "optimizer": optimizer,
                 "lr_scheduler": scheduler,}

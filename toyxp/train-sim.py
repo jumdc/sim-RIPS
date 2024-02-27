@@ -7,6 +7,8 @@ from omegaconf import DictConfig
 import pyrootutils
 import hydra
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -16,6 +18,7 @@ root = pyrootutils.setup_root(
 
 from model import SimCLR_pl
 from data_utils import Augment, get_stl_dataloader
+from utils.helpers import SizeDatamodule
 
 @hydra.main(
     version_base="1.2",
@@ -25,7 +28,7 @@ def train(cfg: DictConfig):
     if cfg.logger.mode == "offline":
         os.environ["WANDB_MODE"] = "offline"
         os.environ['WANDB_DIR'] = cfg.paths.logs
-
+    callbacks = [SizeDatamodule()]
     name = f"{cfg.prefix}_{datetime.now().strftime('%Y-%m-%d_%Hh%M')}"
     model = SimCLR_pl(cfg, 
                       model=resnet18(pretrained=False), 
@@ -39,10 +42,13 @@ def train(cfg: DictConfig):
                         project=cfg.logger.project,
                         log_model=True) 
                         if cfg.log else None)
+    if cfg.log: 
+        callbacks.append(LearningRateMonitor(logging_interval="epoch"))
     progress_bar = False if cfg.trainer.___config_name___ == "jz" else True 
     ### Self-supervised 
     if cfg.self_supervised.pretrained:
         trainer = Trainer(logger=logger,
+                        callbacks=callbacks,
                         enable_progress_bar=progress_bar,
                         overfit_batches=cfg.overfit_batches,
                         accelerator=cfg.trainer.accelerator,
@@ -53,7 +59,10 @@ def train(cfg: DictConfig):
                     data_loader['val'])
 
     ### Linear evaluation 
-    model.make_classifier()
+    model.stage = "classification"
+    callbacks = [SizeDatamodule()]
+    if cfg.log:
+       callbacks.append(LearningRateMonitor(logging_interval="epoch"))
     data_loader = get_stl_dataloader(cfg=cfg,
                                      batch_size=cfg.supervised.batch_size, 
                                      transform=transform.test_transform,
