@@ -7,6 +7,5 @@ python toyxp/train-sim.py \
 ++overfit_batches=2 \
 ++log=True \
 ++batch_size=128 \
-++num_workers=30 \
 ++log=False \
 ++self_supervised.loss=vicREG

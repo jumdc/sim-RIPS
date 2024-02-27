@@ -1,13 +1,13 @@
 #!/bin/bash
 
 #SBATCH --time=06:00:00
-#SBATCH --job-name=clr
-#SBATCH --output=/gpfswork/rech/oyr/urt67oj/out/simCLR.out
+#SBATCH --job-name=vic
+#SBATCH --output=/gpfswork/rech/oyr/urt67oj/out/vic.out
 #SBATCH --partition=gpu_p2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
-#SBATCH --nodes=1 
-#SBATCH --gres=gpu:6 # reserver 1 GPU par noeud
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4 # reserver 1 GPU par noeud
 
 
 echo "hello world"
@@ -20,9 +20,9 @@ conda activate multimodal
 python toyxp/train-sim.py \
 paths=jz \
 trainer=jz \
-++prefix=simCLR \
+++prefix=vicREG \
 ++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
+++self_supervised.epochs=100 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \

@@ -37,12 +37,11 @@ class Augment:
     def __call__(self, x):
         return self.train_transform(x), self.train_transform(x)
 
-def get_stl_dataloader(root, 
+def get_stl_dataloader(cfg,
                        batch_size, 
                        transform=None,
-                       split="unlabeled",
-                       num_workers=cpu_count()//2):      
-    stl10 = STL10(root, 
+                       split="unlabeled"):      
+    stl10 = STL10(cfg.paths.data, 
                   split=split, 
                   transform=transform, 
                   download=True)
@@ -54,11 +53,18 @@ def get_stl_dataloader(root,
                                     stl10, 
                                     [train_size, val_size], 
                                     generator=torch.Generator().manual_seed(1))
-        train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_batches = DataLoader(val_subset, batch_size=batch_size, shuffle=True)
-        dataloader = {"train": train_dataloader, "val": val_batches}
+        train_dataloader = DataLoader(train_subset, 
+                                      batch_size=batch_size, 
+                                      shuffle=True, 
+                                      num_workers=cfg.num_workers)
+        val_batches = DataLoader(val_subset, 
+                                 batch_size=batch_size, 
+                                 shuffle=False,
+                                 num_workers=cfg.num_workers)
+        dataloader = {"train": train_dataloader, 
+                      "val": val_batches}
     else: 
         dataloader = DataLoader(dataset=stl10, 
                                batch_size=batch_size, 
-                               num_workers=num_workers)
+                               num_workers=cfg.num_workers)
     return dataloader
