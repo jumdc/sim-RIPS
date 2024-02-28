@@ -26,7 +26,7 @@ class SimCLR_pl(pl.LightningModule):
                     self.loss = symInfoNCE(self.cfg)
                 elif self.cfg.self_supervised.loss == "vicreg":
                     self.loss = vicREG(self.cfg)
-                elif self.cfg.self_supervised.loss == "topo":
+                elif self.cfg.self_supervised.loss == "simrips":
                     self.loss = TopologicalLoss(self.cfg, 
                                                 logger=self.logger)
             else:
@@ -161,19 +161,16 @@ class SimCLR_pl(pl.LightningModule):
     def configure_optimizers(self):
         if self.stage == "self-supervised":
             max_epochs = int(self.cfg.epochs)
-            # param_groups = define_param_groups(self.model, 
-            #                                    self.cfg.self_supervised.weight_decay, 
-            #                                    'adam')
             lr = self.cfg.self_supervised.lr
             optimizer = Adam(self.parameters(), 
                             lr=lr, 
                             weight_decay=self.cfg.self_supervised.weight_decay)
-            if self.cfg.self_supervised.loss == "cosine":
+            if self.cfg.self_supervised.loss in ["simclr","vicreg"]:
                 scheduler = CosineWarmupScheduler(optimizer, 
                                 epoch_warmup=10, 
                                 max_epoch=max_epochs,
                                 min_lr=0.0)
-            elif self.cfg.self_supervised.loss == "topo":
+            else:
                 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                               lambda epoch: 1./(epoch + 1))
             configuration = {"optimizer": optimizer,

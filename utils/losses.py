@@ -72,6 +72,8 @@ class TopologicalLoss(nn.Module):
         self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
         
         self.distance = WassersteinDistance(p=1)
+        self.w_l2 = cfg['topological']['w_l2']
+        self.w_topo = cfg['topological']['w_topo']
         self.logger = logger
 
     def forward(self, x_1, x_2, *args, **kwargs):
@@ -85,7 +87,7 @@ class TopologicalLoss(nn.Module):
             fig = plot_diagram(pi_1, pi_2)
             self.logger.experiment.log({f"persistent_diagram": wandb.Image(fig)})
         topological_loss = self.distance(pi_1, pi_2)
-        return representation_loss + topological_loss
+        return self.w_l2 * representation_loss + self.w_topo * topological_loss
     
 
 def plot_diagram(pi, pi_2):

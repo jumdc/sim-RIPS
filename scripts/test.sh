@@ -8,5 +8,6 @@ python toyxp/train-sim.py \
 ++topological.max_dim=1 \
 ++batch_size=128 \
 ++log=False \
-++ckpt=True \
-++self_supervised.loss=topo
+++ckpt=False \
+++topological.w_l2=0 \
+++self_supervised.loss=simrips
