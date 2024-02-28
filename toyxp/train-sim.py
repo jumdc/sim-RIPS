@@ -63,6 +63,10 @@ def train(cfg: DictConfig):
     callbacks = [SizeDatamodule()]
     if cfg.log:
        callbacks.append(LearningRateMonitor(logging_interval="epoch"))
+    if cfg.ckpt:
+       callbacks.append(ModelCheckpoint(save_last=False, 
+                                        dirpath=f"checkpoints", 
+                                        filename=name))
     data_loader = get_stl_dataloader(cfg=cfg,
                                      batch_size=cfg.supervised.batch_size, 
                                      transform=transform.test_transform,
@@ -73,7 +77,7 @@ def train(cfg: DictConfig):
                                         transform=transform.test_transform,
                                         split='test')
     
-    trainer_supervised = Trainer(callbacks=[],
+    trainer_supervised = Trainer(callbacks=callbacks,
                                 enable_progress_bar=progress_bar,
                                 logger=logger,
                                 overfit_batches=cfg.overfit_batches,

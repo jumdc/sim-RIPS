@@ -56,13 +56,13 @@ class SizeDatamodule(pl.callbacks.Callback):
         """At each epoch start, log the size of the train set."""
         if pl_module.logger:
             pl_module.logger.log_metrics(
-                {"train-size": print(len(trainer.train_dataloader)),
-                 "val-size": len(trainer.val_dataloaders[0])},
+                {"train-size": print(len(trainer.train_dataloader.dataset)),
+                 "val-size": len(trainer.val_dataloaders[0].dataset)},
                                          step=0)
 
     def on_test_start(self, trainer: "pl.Trainer", 
                       pl_module: "pl.LightningModule") -> None:
         """At each test start, log the size of the test set."""
         if pl_module.logger:
-            pl_module.logger.log_metrics({"test-size":len(trainer.test_dataloaders[0])},
+            pl_module.logger.log_metrics({"test-size":len(trainer.test_dataloaders[0].dataset)},
                                          step=0)
