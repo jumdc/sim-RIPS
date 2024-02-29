@@ -7,7 +7,7 @@ python toyxp/train-sim.py \
 ++overfit_batches=2 \
 ++topological.max_dim=1 \
 ++batch_size=128 \
-++log=False \
+++log=True \
 ++ckpt=False \
-++topological.w_l2=0 \
+++topological.w_topo=0.1 \
 ++self_supervised.loss=simrips

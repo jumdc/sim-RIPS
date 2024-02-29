@@ -165,14 +165,14 @@ class SimCLR_pl(pl.LightningModule):
             optimizer = Adam(self.parameters(), 
                             lr=lr, 
                             weight_decay=self.cfg.self_supervised.weight_decay)
-            if self.cfg.self_supervised.loss in ["simclr","vicreg"]:
-                scheduler = CosineWarmupScheduler(optimizer, 
-                                epoch_warmup=10, 
-                                max_epoch=max_epochs,
-                                min_lr=0.0)
-            else:
-                scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                                                              lambda epoch: 1./(epoch + 1))
+            # if self.cfg.self_supervised.loss in ["simclr","vicreg"]:
+            scheduler = CosineWarmupScheduler(optimizer, 
+                            epoch_warmup=10, 
+                            max_epoch=max_epochs,
+                            min_lr=self.cfg.supervised.min_lr)
+            # else:
+            #     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+            #                                                   lambda epoch: 1./(epoch + 1))
             configuration = {"optimizer": optimizer,
                             "lr_scheduler": scheduler}
         else:

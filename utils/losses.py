@@ -68,8 +68,10 @@ class TopologicalLoss(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
         
-        self.rips_1 = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
-        self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
+        self.rips_1 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
+                                          keep_infinite_features=True)
+        self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
+                                          keep_infinite_features=True)
         
         self.distance = WassersteinDistance(p=1)
         self.w_l2 = cfg['topological']['w_l2']
@@ -94,37 +96,61 @@ def plot_diagram(pi, pi_2):
     fig, axs = plt.subplots(constrained_layout=True, 
                             ncols=2,
                             figsize=(15, 10))
-    max_x_1, max_y_1, max_x_2, max_y_2 = 0, 0, 0, 0
-
+    maxi_x, maxi_y = 0, 0
+    colors = plt.cm.viridis(np.linspace(0, 1, len(pi)))
     for dim in range(len(pi)):
+        # diag 1
         diag = pi[dim].diagram.detach().cpu().numpy()
+        inf_idx = np.where(np.isinf(diag[:,1]))
+        birth_inf = diag[inf_idx,0]
+        diag = np.delete(diag, inf_idx, axis=0)
+        # diag 2
         diag_2 = pi_2[dim].diagram.detach().cpu().numpy()
+        inf_idx_2 = np.where(np.isinf(diag_2[:,1]))
+        birth_inf_2 = diag_2[inf_idx,0]
+        diag_2 = np.delete(diag_2, inf_idx_2, axis=0)
+        # max
+        maxi_x = max(maxi_x, np.max(diag[:,0]), np.max(diag_2[:,0]))
+        maxi_y = max(maxi_y, np.max(diag[:,1]), np.max(diag_2[:,1]))
         if len(diag) > 0:
-            max_x_1 = max(max_x_1, np.max(diag[:,0]))
-            max_y_1 = max(max_y_1, np.max(diag[:,1]))
             axs[0].scatter(diag[:, 0], 
                            diag[:, 1], 
+                            c=colors[dim],
+                            marker="x",
                            label=f"$H_{dim}$ - number of points: {diag.shape[0]}")
+            axs[0].scatter(birth_inf, 
+                    np.repeat(maxi_y, birth_inf.shape[1]),
+                    marker="o",
+                    s=30,
+                    c=colors[dim],
+                    label=f"$H_{dim}$ - inf")
+            
         if len(diag_2) > 0:
-            max_x_2 = max(max_x_2, np.max(diag_2[:,0]))
-            max_y_2 = max(max_y_2, np.max(diag_2[:,1]))
             axs[1].scatter(diag_2[:, 0], 
                            diag_2[:, 1], 
+                            marker="x",
+                            c=colors[dim],
                            label=f"$H_{dim}$ - number of points: {diag_2.shape[0]}")
+            axs[1].scatter(birth_inf_2, 
+                    np.repeat(maxi_y, birth_inf_2.shape[1]),
+                    marker="o",
+                    s=30,
+                    c=colors[dim],
+                    label=f"$H_{dim}$ - inf")
 
     axs[0].set_title("Persistent Diagram - view 1")
-    axs[0].set_xlim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
-    axs[0].set_ylim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
-    axs[0].plot([0,  max(max_y_1, max_y_2)],[0,  max(max_y_1, max_y_2)], c="lightgrey") # diagonal
+    axs[0].set_xlim(0, max(maxi_x, maxi_y))
+    axs[0].set_ylim(0, max(maxi_x, maxi_y))
+    axs[0].plot([0,  max(maxi_x, maxi_y)],[0,  max(maxi_x, maxi_y)], c="lightgrey") # diagonal
     
     axs[0].set_xlabel("Birth")
     axs[0].set_ylabel("Death")
     axs[0].legend()
 
     axs[1].set_title("Persistent Diagram - view 2")
-    axs[1].set_xlim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
-    axs[1].set_ylim(0, max(max_x_1, max_x_2, max_y_1, max_y_2))
-    axs[1].plot([0, max(max_y_1, max_y_2)],[0,  max(max_y_1, max_y_2)], c="lightgrey") # diagonal
+    axs[1].set_xlim(0, max(maxi_x, maxi_y))
+    axs[1].set_ylim(0, max(maxi_x, maxi_y))
+    axs[1].plot([0, max(maxi_x, maxi_y)],[0, max(maxi_x, maxi_y)], c="lightgrey") # diagonal
 
     axs[1].set_xlabel("Birth")
     axs[1].set_ylabel("Death")
