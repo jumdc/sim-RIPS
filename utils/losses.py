@@ -67,7 +67,6 @@ class TopologicalLoss(nn.Module):
     def __init__(self, cfg, logger):
         super().__init__()
         self.mse = nn.MSELoss()
-        
         self.rips_1 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
                                           keep_infinite_features=True)
         self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
@@ -124,7 +123,6 @@ def plot_diagram(pi, pi_2):
                     s=30,
                     c=colors[dim],
                     label=f"$H_{dim}$ - inf")
-            
         if len(diag_2) > 0:
             axs[1].scatter(diag_2[:, 0], 
                            diag_2[:, 1], 
