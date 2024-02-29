@@ -3,7 +3,7 @@ defaults:
   - trainer: gpu
   - paths: didion
   - logger: wandb
-ckpt: False
+ckpt: True
 prefix: toy-xp
 epochs: 300 # number of training epochs
 overfit_batches: 0
