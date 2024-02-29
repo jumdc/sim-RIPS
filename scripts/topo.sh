@@ -1,66 +1,62 @@
 python toyxp/train-sim.py \
-++prefix=vicREG-64 \
+++prefix=TOPOReg-64-l-0.1 \
 ++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
+++self_supervised.epochs=100 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \
 ++log=True \
+++topological.max_dim=1 \
 ++batch_size=64 \
 ++supervised.batch_size=64 \
+++self_supervised.lr=1e-4 \
+++topological.w_topo=0.1 \
 ++logger.mode=offline \
-++self_supervised.loss=vicreg
+++self_supervised.loss=simrips
 
 python toyxp/train-sim.py \
-++prefix=vicREG-256 \
+++prefix=TOPOReg-64 \
 ++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
-++supervised.epochs=100 \
-++supervised.lr=1e-4 \
-++overfit_batches=0 \
-++log=True \
-++batch_size=256 \
-++supervised.batch_size=256 \
-++logger.mode=offline \
-++self_supervised.loss=vicreg
-
-python toyxp/train-sim.py \
-++prefix=vicREG-1024 \
-++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
-++supervised.epochs=100 \
-++supervised.lr=1e-4 \
-++overfit_batches=0 \
-++log=True \
-++batch_size=1024 \
-++supervised.batch_size=1024 \
-++logger.mode=offline \
-++self_supervised.loss=vicreg
-
-python toyxp/train-sim.py \
-++prefix=simCLR-256 \
-++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
+++self_supervised.epochs=100 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \
 ++log=True \
 ++topological.max_dim=1 \
-++batch_size=256 \
-++supervised.batch_size=256 \
+++batch_size=64 \
+++supervised.batch_size=64 \
+++self_supervised.lr=1e-4 \
 ++logger.mode=offline \
-++self_supervised.loss=simclr
+++self_supervised.loss=simrips
 
 python toyxp/train-sim.py \
-++prefix=simCLR-1024 \
+++prefix=TOPOReg-128 \
 ++self_supervised.pretrained=True \
-++self_supervised.epochs=200 \
+++self_supervised.epochs=100 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \
 ++log=True \
 ++topological.max_dim=1 \
-++batch_size=1024 \
-++supervised.batch_size=1024 \
+++batch_size=128 \
+++supervised.batch_size=128 \
+++self_supervised.lr=1e-4 \
 ++logger.mode=offline \
-++self_supervised.loss=simclr
+++self_supervised.loss=simrips
+
+
+python toyxp/train-sim.py \
+++prefix=TOPOReg-128-l-0.1 \
+++self_supervised.pretrained=True \
+++self_supervised.epochs=100 \
+++supervised.epochs=100 \
+++supervised.lr=1e-4 \
+++overfit_batches=0 \
+++log=True \
+++topological.max_dim=1 \
+++batch_size=128 \
+++supervised.batch_size=128 \
+++self_supervised.lr=1e-4 \
+++topological.w_topo=0.1 \
+++logger.mode=offline \
+++self_supervised.loss=simrips
