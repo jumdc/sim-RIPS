@@ -71,8 +71,8 @@ class TopologicalLoss(nn.Module):
                                           keep_infinite_features=True)
         self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
                                           keep_infinite_features=True)
-        
-        self.distance = WassersteinDistance(p=1)
+        self.batch_size = cfg['batch_size'] # normalize as in Topological AutoEncoders
+        self.distance = WassersteinDistance(p=2)
         self.w_l2 = cfg['topological']['w_l2']
         self.w_topo = cfg['topological']['w_topo']
         self.logger = logger
@@ -84,10 +84,9 @@ class TopologicalLoss(nn.Module):
         if (len(args) > 0 
             and args[0]
             and isinstance(self.logger, WandbLogger)):
-            print("here")
             fig = plot_diagram(pi_1, pi_2)
             self.logger.experiment.log({f"persistent_diagram": wandb.Image(fig)})
-        topological_loss = self.distance(pi_1, pi_2)
+        topological_loss = self.distance(pi_1, pi_2) / self.batch_size
         return self.w_l2 * representation_loss + self.w_topo * topological_loss
     
 
@@ -100,35 +99,61 @@ def plot_diagram(pi, pi_2):
     for dim in range(len(pi)):
         # diag 1
         diag = pi[dim].diagram.detach().cpu().numpy()
-        inf_idx = np.where(np.isinf(diag[:,1]))
-        birth_inf = diag[inf_idx,0]
-        diag = np.delete(diag, inf_idx, axis=0)
-        # diag 2
         diag_2 = pi_2[dim].diagram.detach().cpu().numpy()
-        inf_idx_2 = np.where(np.isinf(diag_2[:,1]))
-        birth_inf_2 = diag_2[inf_idx,0]
-        diag_2 = np.delete(diag_2, inf_idx_2, axis=0)
+        print(diag)
+        print(diag_2)
+        if diag.shape[0] > 0:
+            inf_idx = np.where(np.isinf(diag[:,1]))
+            birth_inf = diag[inf_idx,0]
+            diag = np.delete(diag, 
+                             inf_idx, 
+                             axis=0)
+            if diag.shape[0] > 0: # check if  there are other than inf vlaues
+                maxi_x_1 = np.max(diag[:,0])
+                maxi_y_1 = np.max(diag[:,1])
+            else : 
+                maxi_x_1 = 0
+                maxi_y_1 = 0
+        else: 
+            diag = np.array([])
+            maxi_x_1 = 0
+            maxi_y_1 = 0
+        # diag 2
+        if diag_2.shape[0] > 0:
+            inf_idx_2 = np.where(np.isinf(diag_2[:,1]))
+            birth_inf_2 = diag_2[inf_idx,0]
+            diag_2 = np.delete(diag_2, inf_idx_2, axis=0)
+            if diag_2.shape[0] > 0: # check if there are other than inf values 
+                maxi_x_2 = np.max(diag_2[:,0])
+                maxi_y_2 = np.max(diag_2[:,1])
+            else: 
+                maxi_x_2 = 0
+                maxi_y_2 = 0
+        else: 
+            diag_2 = np.array([])
+            maxi_x_2 = 0
+            maxi_y_2 = 0
         # max
-        maxi_x = max(maxi_x, np.max(diag[:,0]), np.max(diag_2[:,0]))
-        maxi_y = max(maxi_y, np.max(diag[:,1]), np.max(diag_2[:,1]))
-        if len(diag) > 0:
+        maxi_x = max(maxi_x, maxi_x_1, maxi_x_2)
+        maxi_y = max(maxi_y, maxi_y_1, maxi_y_2)
+        if diag.shape[0] > 0:
             axs[0].scatter(diag[:, 0], 
-                           diag[:, 1], 
+                        diag[:, 1], 
                             c=colors[dim],
                             marker="x",
-                           label=f"$H_{dim}$ - number of points: {diag.shape[0]}")
+                        label=f"$H_{dim}$ - number of points: {diag.shape[0]}")
             axs[0].scatter(birth_inf, 
                     np.repeat(maxi_y, birth_inf.shape[1]),
                     marker="o",
                     s=30,
                     c=colors[dim],
                     label=f"$H_{dim}$ - inf")
-        if len(diag_2) > 0:
+        if diag_2.shape[0] > 0:
             axs[1].scatter(diag_2[:, 0], 
-                           diag_2[:, 1], 
+                        diag_2[:, 1], 
                             marker="x",
                             c=colors[dim],
-                           label=f"$H_{dim}$ - number of points: {diag_2.shape[0]}")
+                        label=f"$H_{dim}$ - number of points: {diag_2.shape[0]}")
             axs[1].scatter(birth_inf_2, 
                     np.repeat(maxi_y, birth_inf_2.shape[1]),
                     marker="o",
@@ -160,5 +185,4 @@ def plot_diagram(pi, pi_2):
     plt.close("all")
     pd = np.expand_dims(pd, axis=0) 
     return pd
-    
     

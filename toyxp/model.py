@@ -7,6 +7,8 @@ from utils.helpers import default, CosineWarmupScheduler
 import torchvision.models as models
 from torchmetrics import Accuracy, F1Score
 
+from utils.evaluation_rpz import compute_metrics_contrastive
+
 from utils.losses import symInfoNCE, vicREG, TopologicalLoss
 
 class SimCLR_pl(pl.LightningModule):
@@ -18,6 +20,7 @@ class SimCLR_pl(pl.LightningModule):
                              mlp_dim=feat_dim)
         self.test_epoch_outputs = []
         self.stage = stage
+        self.validation_step_outputs = []
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
@@ -30,7 +33,6 @@ class SimCLR_pl(pl.LightningModule):
                     self.loss = TopologicalLoss(self.cfg, 
                                                 logger=self.logger)
             else:
-                print("hhhheerre in set up")
                 self.model.projection = nn.Identity()
                 self.classifier = nn.Linear(self.cfg.representation_size, 
                                             self.cfg.num_classes)
@@ -100,6 +102,7 @@ class SimCLR_pl(pl.LightningModule):
                     on_step=True, 
                     on_epoch=True, 
                     logger=True)
+            self.validation_step_outputs.append({"view_1": z1})
         else: 
             x, y = batch
             logits = self.forward(x)
@@ -125,6 +128,19 @@ class SimCLR_pl(pl.LightningModule):
                     logger=True)
         return loss
     
+    def on_validation_epoch_end(self) -> None:
+        if self.stage == "self-supervised":
+            plot = (True if (
+                            self.current_epoch == self.cfg["self_supervised"]["epochs"] - 1 
+                            or self.current_epoch % 10 == 0)
+                    else False)
+            compute_metrics_contrastive(logger=self.logger,
+                                        outputs=self.validation_step_outputs,
+                                        prefix="val",
+                                        plot=plot)
+            self.validation_step_outputs.clear()
+
+    
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
@@ -135,14 +151,10 @@ class SimCLR_pl(pl.LightningModule):
     def on_test_epoch_end(self) -> None:
         outputs = self.test_epoch_outputs    
         y_true = torch.cat([x["targets"] 
-                            for x in outputs]) # .cpu().detach()
+                            for x in outputs]) 
         logits = torch.cat([x["probas"] 
-                            for x in outputs]) # .cpu().detach()
+                            for x in outputs])
         probas = torch.softmax(logits, dim=1)   
-        print(self.accuracy(probas, y_true))
-        # self.logger.log_metrics({"test_accuracy": self.accuracy(probas, y_true),
-        #                         "test_f1": self.f1(probas, y_true)},
-        #                         step=self.current_epoch)     
         self.log('test_accuracy',
                 self.accuracy(probas, 
                               y_true),
@@ -165,16 +177,17 @@ class SimCLR_pl(pl.LightningModule):
             optimizer = Adam(self.parameters(), 
                             lr=lr, 
                             weight_decay=self.cfg.self_supervised.weight_decay)
-            # if self.cfg.self_supervised.loss in ["simclr","vicreg"]:
-            scheduler = CosineWarmupScheduler(optimizer, 
-                            epoch_warmup=10, 
-                            max_epoch=max_epochs,
-                            min_lr=self.cfg.supervised.min_lr)
-            # else:
-            #     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-            #                                                   lambda epoch: 1./(epoch + 1))
-            configuration = {"optimizer": optimizer,
-                            "lr_scheduler": scheduler}
+            if self.cfg.self_supervised.loss in ["simclr","vicreg"]:
+                scheduler = CosineWarmupScheduler(optimizer, 
+                                epoch_warmup=10, 
+                                max_epoch=max_epochs,
+                                min_lr=self.cfg.supervised.min_lr)
+                configuration = {"optimizer": optimizer, "lr_scheduler": scheduler}
+            else:
+                configuration = {"optimizer": optimizer}
+                # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                #                                               lambda epoch: 1./(epoch + 1))
+            
         else:
             max_epochs = int(self.cfg.supervised.epochs)
             lr = self.cfg.supervised.lr
