@@ -59,36 +59,37 @@ def train(cfg: DictConfig):
                     data_loader['val'])
 
     ### Linear evaluation 
-    model.stage = "classification"
-    callbacks = [SizeDatamodule()]
-    if cfg.log:
-       callbacks.append(LearningRateMonitor(logging_interval="epoch"))
-    # if cfg.ckpt:
-    #    callbacks.append(ModelCheckpoint(save_last=False, 
-    #                                     dirpath=f"checkpoints", 
-    #                                     filename=name))
-    data_loader = get_stl_dataloader(cfg=cfg,
-                                     batch_size=cfg.supervised.batch_size, 
-                                     transform=transform.test_transform,
-                                     split="train")
-    
-    data_loader_test = get_stl_dataloader(cfg=cfg,
+    if cfg.classification:
+        model.stage = "classification"
+        callbacks = [SizeDatamodule()]
+        if cfg.log:
+            callbacks.append(LearningRateMonitor(logging_interval="epoch"))
+        # if cfg.ckpt:
+        #    callbacks.append(ModelCheckpoint(save_last=False, 
+        #                                     dirpath=f"checkpoints", 
+        #                                     filename=name))
+        data_loader = get_stl_dataloader(cfg=cfg,
                                         batch_size=cfg.supervised.batch_size, 
                                         transform=transform.test_transform,
-                                        split='test')
-    
-    trainer_supervised = Trainer(callbacks=callbacks,
-                                enable_progress_bar=progress_bar,
-                                logger=logger,
-                                overfit_batches=cfg.overfit_batches,
-                                accelerator=cfg.trainer.accelerator,
-                                gpus=cfg.trainer.devices,
-                                max_epochs=cfg.supervised.epochs)
-    trainer_supervised.fit(model, 
-                data_loader['train'], 
-                data_loader['val'])
-    trainer_supervised.test(model, 
-                 data_loader_test)
+                                        split="train")
+        
+        data_loader_test = get_stl_dataloader(cfg=cfg,
+                                            batch_size=cfg.supervised.batch_size, 
+                                            transform=transform.test_transform,
+                                            split='test')
+        
+        trainer_supervised = Trainer(callbacks=callbacks,
+                                    enable_progress_bar=progress_bar,
+                                    logger=logger,
+                                    overfit_batches=cfg.overfit_batches,
+                                    accelerator=cfg.trainer.accelerator,
+                                    gpus=cfg.trainer.devices,
+                                    max_epochs=cfg.supervised.epochs)
+        trainer_supervised.fit(model, 
+                    data_loader['train'], 
+                    data_loader['val'])
+        trainer_supervised.test(model, 
+                    data_loader_test)
     
     if cfg.log:
         logger.finalize(status="success")

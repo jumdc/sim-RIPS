@@ -29,4 +29,4 @@ def compute_metrics_contrastive(logger,
         plt.close("all")
         pd = np.expand_dims(pd, axis=0) 
         if logger is not None:
-            logger.experiment.log({f"{prefix}-variancex": wandb.Image(fig)})
+            logger.experiment.log({f"{prefix}-variance": wandb.Image(fig)})

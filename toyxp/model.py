@@ -95,7 +95,7 @@ class SimCLR_pl(pl.LightningModule):
             loss = self.loss(z1, 
                              z2, 
                             (True 
-                             if (self.current_epoch % 10 == 0 and batch_idx == 0) 
+                             if (self.current_epoch % 5 == 0 and batch_idx == 0) 
                              else False))
             self.log('contrastive_loss', 
                     loss, 

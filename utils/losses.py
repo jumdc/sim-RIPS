@@ -7,6 +7,7 @@ import numpy as np
 from pytorch_lightning.loggers import WandbLogger
 import wandb
 from torch_topological.nn import VietorisRipsComplex, WassersteinDistance
+import logging
 
 class symInfoNCE(nn.Module):
     """symmetric infoNCE loss, aka same scheme than in ImageBind"""
@@ -31,8 +32,10 @@ class vicREG(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
         self.cov_coef = cfg['self_supervised']['cov_coef']
+        self.std_coef = cfg['self_supervised']['std_coef']
         self.batch_size = cfg['batch_size']
         self.num_features = cfg['embedding_size']
+        logging.info(f"vicREG loss with cov_coef: {self.cov_coef} and std_coef: {self.std_coef}")
 
     def forward(self, x_1, x_2, *args, **kwargs):
         repr_loss = self.mse(x_1, x_2)
@@ -52,7 +55,7 @@ class vicREG(nn.Module):
         ) + off_diagonal(cov_x_2).pow_(2).sum().div(self.num_features)
 
         loss = (repr_loss
-                + std_loss
+                + self.std_coef * std_loss
                 + self.cov_coef * cov_loss)
         return loss
 
@@ -67,26 +70,26 @@ class TopologicalLoss(nn.Module):
     def __init__(self, cfg, logger):
         super().__init__()
         self.mse = nn.MSELoss()
-        self.rips_1 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
-                                          keep_infinite_features=True)
-        self.rips_2 = VietorisRipsComplex(dim=cfg['topological']['max_dim'], 
-                                          keep_infinite_features=True)
+        print(cfg["topological"])
+        self.rips = VietorisRipsComplex(dim=cfg['topological']['max_dim'])
         self.batch_size = cfg['batch_size'] # normalize as in Topological AutoEncoders
-        self.distance = WassersteinDistance(p=2)
+        self.distance = WassersteinDistance(p=2) # euclidean ?
         self.w_l2 = cfg['topological']['w_l2']
         self.w_topo = cfg['topological']['w_topo']
         self.logger = logger
 
     def forward(self, x_1, x_2, *args, **kwargs):
         representation_loss = self.mse(x_1, x_2)
-        pi_1 = self.rips_1(x_1)
-        pi_2 = self.rips_2(x_2)
+        pi_1 = self.rips(x_1)
+        pi_2 = self.rips(x_2)
         if (len(args) > 0 
             and args[0]
             and isinstance(self.logger, WandbLogger)):
             fig = plot_diagram(pi_1, pi_2)
             self.logger.experiment.log({f"persistent_diagram": wandb.Image(fig)})
-        topological_loss = self.distance(pi_1, pi_2) / self.batch_size
+        
+        topological_loss = (self.distance(pi_1, pi_2) + self.distance(pi_2, pi_1)) / 2 * self.batch_size
+
         return self.w_l2 * representation_loss + self.w_topo * topological_loss
     
 
@@ -100,8 +103,6 @@ def plot_diagram(pi, pi_2):
         # diag 1
         diag = pi[dim].diagram.detach().cpu().numpy()
         diag_2 = pi_2[dim].diagram.detach().cpu().numpy()
-        print(diag)
-        print(diag_2)
         if diag.shape[0] > 0:
             inf_idx = np.where(np.isinf(diag[:,1]))
             birth_inf = diag[inf_idx,0]
