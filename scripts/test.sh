@@ -1,4 +1,4 @@
-python toyxp/train-sim.py \
+python src/train-sim.py \
 ++logger.project=test \
 ++prefix=checks \
 ++self_supervised.pretrained=True \

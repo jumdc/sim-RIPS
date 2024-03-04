@@ -18,7 +18,7 @@ root = pyrootutils.setup_root(
 
 from model import SimCLR_pl
 from data_utils import Augment, get_stl_dataloader
-from utils.helpers import SizeDatamodule
+from src.utils.helpers import SizeDatamodule
 
 @hydra.main(
     version_base="1.2",

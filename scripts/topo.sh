@@ -1,6 +1,6 @@
-python toyxp/train-sim.py \
+python src/train-sim.py \
 ++logger.project="ssl-xplore" \
-++prefix=TOPO-checks \
+++prefix=TOPO-checks-max-dim-2 \
 ++self_supervised.pretrained=True \
 ++self_supervised.epochs=20 \
 ++supervised.epochs=100 \
@@ -12,8 +12,9 @@ python toyxp/train-sim.py \
 ++supervised.batch_size=64 \
 ++self_supervised.lr=1e-4 \
 ++topological.max_dim=0 \
-++topological.w_l2=0 \
+++topological.w_l2=1 \
 ++topological.w_topo=1 \
+++classifcation=False \
 ++self_supervised.loss=simrips
 
 # python toyxp/train-sim.py \
