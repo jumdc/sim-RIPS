@@ -1,20 +1,37 @@
 python src/train-sim.py \
 ++logger.project="ssl-xplore" \
-++prefix=TOPO-checks-max-dim-2 \
+++prefix=TOPO-checks-max-dim-1 \
 ++self_supervised.pretrained=True \
 ++self_supervised.epochs=20 \
 ++supervised.epochs=100 \
 ++supervised.lr=1e-4 \
 ++overfit_batches=0 \
 ++log=True \
-++topological.max_dim=2 \
+++topological.max_dim=1 \
+++topological.w_l2=1 \
+++topological.w_topo=1 \
 ++batch_size=64 \
 ++supervised.batch_size=64 \
 ++self_supervised.lr=1e-4 \
-++topological.max_dim=0 \
+++logger.mode=offline \
+++self_supervised.loss=simrips
+
+python src/train-sim.py \
+++logger.project="ssl-xplore" \
+++prefix=TOPO-checks-max-dim-1-256 \
+++self_supervised.pretrained=True \
+++self_supervised.epochs=20 \
+++supervised.epochs=100 \
+++supervised.lr=1e-4 \
+++overfit_batches=0 \
+++log=True \
+++topological.max_dim=1 \
 ++topological.w_l2=1 \
 ++topological.w_topo=1 \
-++classifcation=False \
+++batch_size=256 \
+++supervised.batch_size=256 \
+++logger.mode=offline \
+++self_supervised.lr=1e-4 \
 ++self_supervised.loss=simrips
 
 # python toyxp/train-sim.py \

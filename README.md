@@ -1,7 +1,11 @@
-# sim-RIPS
+# TOPOReg
+The main challenge in self-supervised learning is to prevent a collapse in which
+the encoders produce constant or non-informative vectors. We yearn to avoid collapse
+by preserving the topological structure of the data accross the different views.
 
-
-# TODO 
+## TODO 
 - [x] simCLR
-- [ ] vicREG
-- [ ] wasserstein
+- [x] vicREG
+- [x] wasserstein
+- [x] `signature_loss`
+
