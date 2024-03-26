@@ -36,6 +36,10 @@ class vicREG(nn.Module):
         self.batch_size = cfg['batch_size']
         self.num_features = cfg['embedding_size']
         logging.info(f"vicREG loss with cov_coef: {self.cov_coef} and std_coef: {self.std_coef}")
+        if cfg['self_supervised']['dtm_reg']:
+            logging.info("vicREG loss with DTM regularization")
+            self.dtm = DTMLoss(cfg)
+            
 
     def forward(self, x_1, x_2, *args, **kwargs):
         repr_loss = self.mse(x_1, x_2)
@@ -57,6 +61,8 @@ class vicREG(nn.Module):
         loss = (repr_loss
                 + self.std_coef * std_loss
                 + self.cov_coef * cov_loss)
+        if hasattr(self, 'dtm'):
+            loss += self.dtm(x_1, x_2)
         return loss
 
 def off_diagonal(x):
@@ -64,6 +70,27 @@ def off_diagonal(x):
     n, m = x.shape
     assert n == m
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
+
+class DTMLoss(nn.Module):
+    def __init__(self, cfg, *args, **kwargs) -> None:
+        """DTM-based loss, as in Deep Topological Metric Learning"""
+        super().__init__(*args, **kwargs)
+        self.k = cfg['dtm']['k']
+        self.MSE = nn.MSELoss()
+
+    def forward(self, x_1, x_2, *args, **kwargs):
+        """forward"""
+        dist_x1 = torch.cdist(x_1, x_1, p=2)
+        dist_x2 = torch.cdist(x_2, x_2, p=2)
+
+        topk_x1 = torch.sum(torch.topk(dist_x1, k=self.k+1, largest=False)[0], 
+                            dim=1)
+        topk_x2 = torch.sum(torch.topk(dist_x2, k=self.k+1, largest=False)[0], 
+                            dim=1)
+        loss = self.MSE(topk_x1, topk_x2)
+        return loss
+    
 
 
 class TopologicalLoss(nn.Module):

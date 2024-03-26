@@ -9,7 +9,7 @@ from torchmetrics import Accuracy, F1Score
 
 from utils.evaluation_rpz import compute_metrics_contrastive
 
-from utils.losses import symInfoNCE, vicREG, TopologicalLoss
+from utils.losses import symInfoNCE, vicREG, TopologicalLoss, DTMLoss
 
 class SimCLR_pl(pl.LightningModule):
     def __init__(self, cfg, model=None, feat_dim=512, stage="self-supervised"):
@@ -29,6 +29,8 @@ class SimCLR_pl(pl.LightningModule):
                     self.loss = symInfoNCE(self.cfg)
                 elif self.cfg.self_supervised.loss == "vicreg":
                     self.loss = vicREG(self.cfg)
+                elif self.cfg.self_supervised.loss == "dtm":
+                    self.loss = DTMLoss(self.cfg)
                 elif self.cfg.self_supervised.loss == "simrips":
                     self.loss = TopologicalLoss(self.cfg, 
                                                 logger=self.logger)
@@ -184,10 +186,7 @@ class SimCLR_pl(pl.LightningModule):
                                 min_lr=self.cfg.supervised.min_lr)
                 configuration = {"optimizer": optimizer, "lr_scheduler": scheduler}
             else:
-                configuration = {"optimizer": optimizer}
-                # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                #                                               lambda epoch: 1./(epoch + 1))
-            
+                configuration = {"optimizer": optimizer}            
         else:
             max_epochs = int(self.cfg.supervised.epochs)
             lr = self.cfg.supervised.lr
@@ -206,7 +205,8 @@ class Encoder(nn.Module):
    def __init__(self, config, model=None, mlp_dim=512):
        super().__init__()
        embedding_size = config.embedding_size
-       self.backbone = default(model, models.resnet18(pretrained=False, num_classes=config.embedding_size))
+       self.backbone = default(model, models.resnet18(pretrained=False, 
+                                                      num_classes=config.embedding_size))
        mlp_dim = default(mlp_dim, self.backbone.fc.in_features)
        print('Dim MLP input:',mlp_dim)
        self.backbone.fc = nn.Identity()

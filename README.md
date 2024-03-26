@@ -8,4 +8,3 @@ by preserving the topological structure of the data accross the different views.
 - [x] vicREG
 - [x] wasserstein
 - [x] `signature_loss`
-
